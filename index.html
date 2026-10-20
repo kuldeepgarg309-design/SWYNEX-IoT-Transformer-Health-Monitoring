@@ -1,0 +1,213 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IoT Transformer Health Monitor</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#0b1220;color:#e5edf8}
+header{padding:24px 5%;background:#111c30;border-bottom:1px solid #293750}
+header h1{margin:0 0 8px;font-size:clamp(22px,4vw,32px)}
+header p{color:#9fb1cc;margin:0}
+main{max-width:1150px;margin:auto;padding:24px 5%}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.pill{padding:8px 12px;border-radius:20px;background:#163b32;color:#72edb2;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin:22px 0}
+.card,.panel{background:#121e32;border:1px solid #2b3a53;border-radius:14px;padding:20px}
+.label{color:#a8bad4;font-size:14px}
+.value{font-size:32px;font-weight:bold;margin:12px 0}
+.note{color:#9fb1cc;font-size:13px}
+.panel{margin:18px 0}
+.panel h2{font-size:19px;margin-top:0}
+.bar{height:9px;background:#26354b;border-radius:8px;overflow:hidden;margin:12px 0}
+.fill{height:100%;width:0;background:#42d6a4;transition:width .3s}
+button{background:#2674e8;color:white;border:0;padding:11px 16px;border-radius:8px;cursor:pointer;font-weight:bold}
+button.secondary{background:#33445e}
+.alert{padding:12px;border-radius:9px;margin:9px 0;background:#173a31;color:#8af0c0}
+.alert.warning{background:#4b321b;color:#ffd08a}
+.alert.danger{background:#4b202b;color:#ff9caa}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:12px 8px;border-bottom:1px solid #293750;font-size:14px}
+th{color:#9fb1cc}
+footer{text-align:center;padding:24px;color:#879ab5;font-size:13px}
+canvas{width:100%;height:210px;display:block}
+.small{font-size:12px;color:#91a5c1}
+</style>
+</head>
+<body>
+<header>
+<h1>⚡ IoT Transformer Health Monitor</h1>
+<p>Smart Transformer Monitoring | Simulated Sensor Dashboard</p>
+</header>
+<main>
+<div class="top">
+<div>
+<h2>Transformer T-01</h2>
+<div class="note">Demo mode · Simulated readings only</div>
+</div>
+<div class="pill" id="connection">● Simulation Running</div>
+</div>
+
+<div class="grid">
+<div class="card">
+<div class="label">🌡️ Temperature</div>
+<div class="value"><span id="temp">68.0</span> °C</div>
+<div class="note">Demo limit: 85 °C</div>
+<div class="bar"><div class="fill" id="tempbar"></div></div>
+</div>
+<div class="card">
+<div class="label">⚡ Voltage</div>
+<div class="value"><span id="volt">415</span> V</div>
+<div class="note">Illustrative nominal: 415 V</div>
+<div class="bar"><div class="fill" id="voltbar"></div></div>
+</div>
+<div class="card">
+<div class="label">〽️ Current</div>
+<div class="value"><span id="amp">42.0</span> A</div>
+<div class="note">Illustrative demo limit: 60 A</div>
+<div class="bar"><div class="fill" id="ampbar"></div></div>
+</div>
+<div class="card">
+<div class="label">🛢️ Oil Level</div>
+<div class="value"><span id="oil">82</span>%</div>
+<div class="note">Simulated oil level</div>
+<div class="bar"><div class="fill" id="oilbar"></div></div>
+</div>
+</div>
+
+<div class="panel">
+<div class="top">
+<h2>Transformer Health Status</h2>
+<div class="pill" id="health">NORMAL</div>
+</div>
+<p id="summary">All simulated readings are within the demo thresholds.</p>
+<div class="note">These thresholds are illustrative and must not be used for real transformer protection.</div>
+</div>
+
+<div class="panel">
+<div class="top">
+<h2>Temperature Trend</h2>
+<button class="secondary" onclick="toggleSimulation()" id="pause">Pause Updates</button>
+</div>
+<canvas id="chart" width="900" height="220"></canvas>
+<div class="small">Recent simulated temperature readings (°C)</div>
+</div>
+
+<div class="panel">
+<h2>System Alerts</h2>
+<div id="alerts"><div class="alert">Simulation started. No abnormal readings detected.</div></div>
+</div>
+
+<div class="panel">
+<h2>Demo Controls</h2>
+<p class="note">Test the dashboard response using simulated fault conditions.</p>
+<div class="top">
+<button onclick="setMode('normal')">Normal</button>
+<button onclick="setMode('hot')">High Temperature</button>
+<button onclick="setMode('overload')">Overload</button>
+<button onclick="setMode('lowoil')">Low Oil</button>
+<button onclick="setMode('lowvoltage')">Low Voltage</button>
+</div>
+<p class="small" id="mode">Current test: Normal operation</p>
+</div>
+
+<div class="panel">
+<h2>Recent Readings</h2>
+<div style="overflow-x:auto">
+<table>
+<thead><tr><th>Time</th><th>Temp °C</th><th>Voltage V</th><th>Current A</th><th>Oil %</th><th>Status</th></tr></thead>
+<tbody id="history"></tbody>
+</table>
+</div>
+</div>
+</main>
+<footer>
+IoT Transformer Health Monitoring · Educational Simulation Project<br>
+No physical sensors, cloud connection, or real transformer are connected.
+</footer>
+
+<script>
+let mode="normal",running=true,tick=0;
+let history=[],trend=[];
+const $=id=>document.getElementById(id);
+function random(a,b){return a+Math.random()*(b-a)}
+function toggleSimulation(){
+ running=!running;
+ $("pause").textContent=running?"Pause Updates":"Resume Updates";
+ $("connection").textContent=running?"● Simulation Running":"● Simulation Paused";
+}
+function setMode(m){
+ mode=m;
+ const names={normal:"Normal operation",hot:"High temperature fault",overload:"Overcurrent / overload demo",lowoil:"Low oil level warning",lowvoltage:"Low voltage warning"};
+ $("mode").textContent="Current test: "+names[m];
+ update();
+}
+function drawChart(){
+ const c=$("chart"),ctx=c.getContext("2d");
+ const w=c.width,h=c.height;
+ ctx.clearRect(0,0,w,h);
+ ctx.strokeStyle="#293750";ctx.lineWidth=1;
+ for(let i=0;i<5;i++){
+  let y=20+i*(h-40)/4;
+  ctx.beginPath();ctx.moveTo(35,y);ctx.lineTo(w-10,y);ctx.stroke();
+ }
+ if(trend.length<2)return;
+ const min=20,max=110;
+ ctx.strokeStyle="#49b9ff";ctx.lineWidth=3;ctx.beginPath();
+ trend.forEach((v,i)=>{
+  let x=35+i*(w-50)/(trend.length-1);
+  let y=h-20-(v-min)/(max-min)*(h-40);
+  if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+ });
+ ctx.stroke();
+}
+function update(){
+ if(!running)return;
+ tick++;
+ let t=random(63,73),v=random(405,425),a=random(37,48),o=random(78,90);
+ if(mode==="hot")t=random(88,100);
+ if(mode==="overload")a=random(65,80);
+ if(mode==="lowoil")o=random(15,28);
+ if(mode==="lowvoltage")v=random(340,365);
+
+ $("temp").textContent=t.toFixed(1);
+ $("volt").textContent=v.toFixed(1);
+ $("amp").textContent=a.toFixed(1);
+ $("oil").textContent=o.toFixed(1);
+
+ $("tempbar").style.width=Math.min(t/110*100,100)+"%";
+ $("voltbar").style.width=Math.min(v/450*100,100)+"%";
+ $("ampbar").style.width=Math.min(a/80*100,100)+"%";
+ $("oilbar").style.width=Math.min(o,100)+"%";
+
+ const alerts=[];
+ if(t>=85)alerts.push(["HIGH TEMPERATURE","danger"]);
+ else if(t>=80)alerts.push(["Temperature elevated","warning"]);
+ if(a>60)alerts.push(["Overcurrent / overload indication","danger"]);
+ if(o<30)alerts.push(["Low oil level indication","danger"]);
+ else if(o<40)alerts.push(["Oil level low","warning"]);
+ if(v<380)alerts.push(["Low voltage indication","warning"]);
+ if(v>450)alerts.push(["High voltage indication","warning"]);
+
+ const severe=alerts.some(x=>x[1]==="danger");
+ const warning=alerts.length>0;
+ $("health").textContent=severe?"ALERT":warning?"WARNING":"NORMAL";
+ $("health").style.background=severe?"#4b202b":warning?"#4b321b":"#163b32";
+ $("health").style.color=severe?"#ff9caa":warning?"#ffd08a":"#72edb2";
+ $("summary").textContent=severe?"A simulated reading crossed a demo alert threshold.":warning?"A simulated reading needs attention.":"All simulated readings are within the demo thresholds.";
+
+ $("alerts").innerHTML=alerts.length?alerts.map(x=>'<div class="alert '+x[1]+'">⚠ '+x[0]+' — simulated condition</div>').join(""):'<div class="alert">✓ No abnormal simulated readings detected.</div>';
+
+ trend.push(t);if(trend.length>35)trend.shift();drawChart();
+ const time=new Date().toLocaleTimeString();
+ history.unshift({time,t,v,a,o,status:severe?"ALERT":warning?"WARNING":"NORMAL"});
+ if(history.length>8)history.pop();
+ $("history").innerHTML=history.map(r=>`<tr><td>${r.time}</td><td>${r.t.toFixed(1)}</td><td>${r.v.toFixed(1)}</td><td>${r.a.toFixed(1)}</td><td>${r.o.toFixed(1)}</td><td>${r.status}</td></tr>`).join("");
+}
+update();
+setInterval(update,3000);
+</script>
+</body>
+</html>
